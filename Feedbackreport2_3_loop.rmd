@@ -1,0 +1,34 @@
+---
+params:
+  date: ""
+date: "`r params$date`"
+geometry: left=0.5cm,right=0.5cm,top=2cm,bottom=2cm
+title: "FATTY ACID ANALYSIS"
+author: "`r paste0('Sample: ', params$sample, ' --- Uploaded: ', params$date)`"
+header-includes:
+  \usepackage{graphicx}
+  \usepackage{fancyhdr}
+  \AtBeginDocument{\let\maketitle\relax}
+output: pdf_document
+---
+
+\makeatletter
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[R]{Investment period: \@date}
+  \fancyhead[L]{Feedback Trading Behaviour}
+  \fancyfoot[C]{\thepage}
+  \fancyfoot[R]{\includegraphics[width=6cm]{Duo_logo.png}}
+}
+
+\pagestyle{plain}
+\vspace*{1\baselineskip}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+print(i)
+```
+
