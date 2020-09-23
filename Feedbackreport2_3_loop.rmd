@@ -28,7 +28,144 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-print(head(WikiDaily_mod))
+```{r, message=FALSE, echo=FALSE}
+# merge the different dataframes on date
+WikiDaily_merge <- merge_mult(list_of_dfs=list(WikiDaily_Id, FactorReturns, EuroStoxx), by=c("date"))
+
+# select relevant columns and rename where necessary 
+WikiDaily_merge <- select(WikiDaily_merge, -c("datenum", "Vstoxx"))
+names(WikiDaily_merge)[names(WikiDaily_merge) == "mkt.x"] <- "factor.market"
+names(WikiDaily_merge)[names(WikiDaily_merge) == "mkt.y"] <- "ret.Eurostoxx"
+
+# normalising portfolio closing prices and index points to 100 at the beginning
+WikiDaily_merge$close.normed <- WikiDaily_merge$close*(100/WikiDaily_merge$close[1])
+WikiDaily_merge$EuroStoxx.normed <- WikiDaily_merge$EuroStoxx*(100/WikiDaily_merge$EuroStoxx[1])
+
+# Calculating Portfolio/Index Return and volatility of Portfolio/Index Returns
+RR_figures <- data.frame(matrix(vector(), nrow=2, ncol=4))
+colnames(RR_figures) <- c("Cumulative_Return", "Annualized_Return", "Annualized_Risk", "Sharpe_Ratio")
+rownames(RR_figures) <- c("Benchmark", "Portfolio")
+
+
+# Cumulative Returns
+RR_figures[1,1] <- returnEuroStoxx <- abs_ret(WikiDaily_merge$EuroStoxx)
+RR_figures[2,1] <- returnPortfolio <- abs_ret(WikiDaily_merge$close)
+# Annualized Returns
+RR_figures[1,2] <- ann_ret(ret= WikiDaily_merge$EuroStoxx, days_ret=days_ret, start_date = start_date, end_date=end_date)
+RR_figures[2,2] <- ann_ret(ret= WikiDaily_merge$close, days_ret=days_ret, start_date = start_date, end_date=end_date)
+# Risk figures (volatility)
+RR_figures[1,3] <- riskBM <- sqrt(days_vola*var(WikiDaily_merge$ret.Eurostoxx))
+RR_figures[2,3] <- riskPortfolio <- sqrt(days_vola*var(WikiDaily_merge$ret))
+# Sharpe Ratio (Cumulative Return/volatility)
+RR_figures[1,4] <- sharpeBM <- (returnEuroStoxx-mean(WikiDaily_merge$rf))/riskBM
+RR_figures[2,4] <- sharpePortfolio <- (returnPortfolio-mean(WikiDaily_merge$rf))/riskPortfolio
+
+# CAPM decomposition
+CAPM_portfolio <- lm(I(ret-rf)~mktrf, data = WikiDaily_merge)
+CAPM_benchmark <- lm(I(ret.Eurostoxx-rf)~mktrf, data = WikiDaily_merge)
+
+# Fama-French decomposition
+decom_portfolio <- lm(I(ret-rf) ~ mktrf+smb+hml+mom, data=WikiDaily_merge)
+decom_benchmark <- lm(I(ret.Eurostoxx-rf) ~ mktrf+smb+hml+mom, data=WikiDaily_merge)
+
+
+# data preparation Investment style plot
+factor <- rep(c( "Market", "Size", "Value", "Momentum"),2)
+y <- c(rep("Your Portfolio", 4), rep("Benchmark",4))
+# exclude alpha from inv.style plot
+coeffs <- c(coefficients(decom_portfolio)[2:length(coefficients(decom_portfolio))], coefficients(decom_benchmark)[2:length(coefficients(decom_benchmark))])
+inv.style <- cbind.data.frame(factor, y, coeffs)
+inv.style <- inv.style %>% filter(factor!="alpha")
+
+# data preparation Risk, Return and Style table
+
+library(data.table)
+library(formattable)
+RRS <- transpose(RR_figures)
+colnames(RRS) <- c("Benchmark", "Your Portfolio")
+RRS[nrow(RRS)+1,] <- c((coefficients(CAPM_benchmark)[1]+1)^days_ret-1, (coefficients(CAPM_portfolio)[1]+1)^days_ret-1)
+RRS[nrow(RRS)+1,] <- c((coefficients(decom_benchmark)[1]+1)^days_ret-1, (coefficients(decom_portfolio)[1]+1)^days_ret-1)
+rownames(RRS) <- c("Cumulative Return","Ann. Return", "Ann. Risk", "Sharpe Ratio", "Ann. CAPM adj. Alpha", "Ann. 3-Factor-adj. Alpha")
+
+# format rows
+RRS_clean <- data.frame(RRS)
+RRS_clean[1,] <- c(paste0(round(RRS[1,1]*100,2),"%"), paste0(round(RRS[1,2]*100,2),"%"))
+RRS_clean[2,] <- c(paste0(round(RRS[2,1]*100,2),"%"), paste0(round(RRS[2,2]*100,2),"%"))
+RRS_clean[3,] <- c(paste0(round(RRS[3,1]*100,2),"%"), paste0(round(RRS[3,2]*100,2),"%"))
+RRS_clean[4,] <- c(round(RRS[4,1],2), round(RRS[4,2],2))
+RRS_clean[5,] <- c(paste0(round(RRS[5,1]*100,2),"%"), paste0(round(RRS[5,2]*100,2),"%"))
+RRS_clean[6,] <- c(paste0(round(RRS[6,1]*100,2),"%"), paste0(round(RRS[6,2]*100,2),"%"))
+
+# data processing Trading Behavior
+
+Trad_figures <- data.frame(matrix(vector(), nrow=4, ncol=2))
+colnames(Trad_figures) <- c("Benchmark", "Your Portfolio")
+rownames(Trad_figures) <- c("Turnover", "Investment temper", "Confidence", "Overconfidence")
 ```
+
+
+```{r, echo=FALSE, fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+
+a <- ggplot() + theme_gray() +
+  geom_line(data=WikiDaily_merge, aes(x=date, y=close.normed, col="darkred")) +
+  geom_line(data=WikiDaily_merge, aes(x=date, y=EuroStoxx.normed, col="steelblue")) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), axis.title.x=element_blank(), axis.title.y=element_blank()) +
+  scale_color_identity(name = "Prices",
+                          breaks = c("steelblue", "darkred"),
+                          labels = c("EuroStoxx", "Your Portfolio"),
+                          guide = "legend") +
+  labs(subtitle="Benchmark Vs Portfolio")
+  
+  
+  
+b <- ggplot() + theme_gray() +
+  geom_point(data=RR_figures[1,], aes(x=Annualized_Return, y=Annualized_Risk, col="steelblue")) +
+  geom_point(data=RR_figures[2,], aes(x=Annualized_Return, y=Annualized_Risk, col="darkred")) +
+  scale_x_continuous(labels=percent_format(accuracy = 1)) +
+  scale_y_continuous(labels=percent_format(accuracy = 1)) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), 
+  plot.caption = element_text(hjust = 0)) +
+  labs(x="Return", y="Risk")+
+  scale_color_identity(name = NULL,
+                          breaks = c("steelblue", "darkred"),
+                          labels = c("Benchmark", "Your Portfolio"),
+                          guide = "legend") +
+  labs(subtitle="Risk Vs Return", caption = " BlaBlaBla \n BlaBlaBla")
+
+
+# max x range
+
+if(max(inv.style$coeffs)>1){
+  max_x <- max(inv.style$coeffs)+0.2
+} else{
+  max_x <- 1.2
+}
+
+c <- ggplot(data=inv.style, aes(coeffs,factor))+geom_point(aes(col=y)) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), 
+  plot.caption = element_text(hjust = 0), axis.title.y=element_blank()) +
+  labs(x="Exposure", col=NULL)+
+  scale_color_manual(values=c("steelblue", "darkred"))+
+  scale_x_continuous(limits = c(min(inv.style$coeffs)-0.1,max_x),
+                     breaks = c(min(inv.style$coeffs)-0.1,0,1,max_x), 
+                     label = c("low","0", "1","high"))+
+  geom_vline(xintercept = 1, color="black")+
+  labs(subtitle="Investment Style", caption = " The black line references a value of 1 \n BlaBlaBla")
+
+
+lay <- rbind(c(1,1),
+             c(2,3))
+grid.arrange(a,b,c, layout_matrix = lay)
+
+#test
+```
+
+
+
+
+
+
 
