@@ -160,7 +160,6 @@ lay <- rbind(c(1,1),
              c(2,3))
 grid.arrange(a,b,c, layout_matrix = lay)
 
-#test
 ```
 
 
