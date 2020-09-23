@@ -29,6 +29,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-print(i)
+print(head(WikiDaily_mod))
 ```
 
