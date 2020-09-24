@@ -15,6 +15,7 @@ header-includes:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "C:/Users/Sven Kohler/Desktop/UZH")
 ```
 
 ```{r, include=FALSE}
