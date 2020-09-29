@@ -11,6 +11,8 @@ library(grid)
 library(lattice)
 library(kableExtra)
 library(scales)
+library(lubridate)
+library(StatMeasures)
 
 # load functions file
 source("functions_report.R")

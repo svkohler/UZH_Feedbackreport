@@ -64,14 +64,14 @@ rownames(RR_figures) <- c("Benchmark", "Portfolio")
 RR_figures[1,1] <- returnEuroStoxx <- abs_ret(WikiDaily_merge$EuroStoxx)
 RR_figures[2,1] <- returnPortfolio <- abs_ret(WikiDaily_merge$close)
 # Annualized Returns
-RR_figures[1,2] <- ann_ret(ret= WikiDaily_merge$EuroStoxx, days_ret=days_ret, start_date = start_date, end_date=end_date)
-RR_figures[2,2] <- ann_ret(ret= WikiDaily_merge$close, days_ret=days_ret, start_date = start_date, end_date=end_date)
+RR_figures[1,2] <- ann_EuroStoxx <- ann_ret(ret= WikiDaily_merge$EuroStoxx, days_ret=days_ret, start_date = start_date, end_date=end_date)
+RR_figures[2,2] <- ann_Portfolio <- ann_ret(ret= WikiDaily_merge$close, days_ret=days_ret, start_date = start_date, end_date=end_date)
 # Risk figures (volatility)
-RR_figures[1,3] <- riskBM <- sqrt(days_vola*var(WikiDaily_merge$ret.Eurostoxx))
-RR_figures[2,3] <- riskPortfolio <- sqrt(days_vola*var(WikiDaily_merge$ret))
+RR_figures[1,3] <- ann_riskBM <- sqrt(days_vola*var(WikiDaily_merge$ret.Eurostoxx))
+RR_figures[2,3] <- ann_riskPortfolio <- sqrt(days_vola*var(WikiDaily_merge$ret))
 # Sharpe Ratio (Cumulative Return/volatility)
-RR_figures[1,4] <- sharpeBM <- (returnEuroStoxx-mean(WikiDaily_merge$rf))/riskBM
-RR_figures[2,4] <- sharpePortfolio <- (returnPortfolio-mean(WikiDaily_merge$rf))/riskPortfolio
+RR_figures[1,4] <- sharpeBM <- (ann_EuroStoxx-mean(WikiDaily_merge$rf))/ann_riskBM
+RR_figures[2,4] <- sharpePortfolio <- (ann_Portfolio-mean(WikiDaily_merge$rf))/ann_riskPortfolio
 
 # CAPM decomposition
 CAPM_portfolio <- lm(I(ret-rf)~mktrf, data = WikiDaily_merge)
@@ -233,7 +233,7 @@ cat(paste0("During the investment period your portfolio attained a \\textbf{cumu
 if(tail(WikiDaily_merge$EuroStoxx.normed, 1)<tail(WikiDaily_merge$close.normed, 1)){
   cat(paste0("You \\textbf{outperformed} the benchmark by ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1),2),"%. "))
 }else{
-  cat(paste0("You \\tetxbf{underperformed} compared to the benchmark. You came up short by ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1), 2),"%. "))
+  cat(paste0("You \\textbf{underperformed} compared to the benchmark. You came up short by ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1), 2),"%. "))
 }
 cat(paste0("This corresponds to an \\textbf{annualized return} of your portfolio of ", round(RRS[2,2]*100,2), "% compared with ", round(RRS[2,1]*100,2), "% for the benchmark."))
 ```
