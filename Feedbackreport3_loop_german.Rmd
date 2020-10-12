@@ -1,0 +1,298 @@
+---
+params:
+  date: ""
+  Id: ""
+date: "`r params$date`"
+author: "`r params$Id`"
+geometry: left=0.5cm,right=0.5cm,top=2cm,bottom=2cm
+header-includes:
+  \usepackage{graphicx}
+  \usepackage{fancyhdr}
+  \AtBeginDocument{\let\maketitle\relax}
+  \usepackage{booktabs}
+  \usepackage[singlelinecheck=false]{caption}
+  \usepackage{subcaption}
+  \usepackage{float}
+  \usepackage{tabularx}
+  \setlength{\tabcolsep}{12pt}
+output: pdf_document
+---
+
+\makeatletter
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[R]{Inv. period: \@date}
+  \fancyhead[C]{\small{ID: \@author}}
+  \fancyhead[L]{Feedback Investitionsverhalten}
+  \fancyfoot[C]{\thepage}
+  \fancyfoot[R]{\includegraphics[width=6cm]{Duo_logo.png}}
+}
+
+\pagestyle{plain}
+\vspace*{1\baselineskip}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, echo=FALSE}
+
+#################
+### Calculation
+#################
+
+# select relevant columns and rename where necessary 
+WikiDaily_merge <- select(WikiDaily_merge, -c("datenum", "Vstoxx"))
+names(WikiDaily_merge)[names(WikiDaily_merge) == "mkt.x"] <- "factor.market"
+names(WikiDaily_merge)[names(WikiDaily_merge) == "mkt.y"] <- "ret.Eurostoxx"
+
+# normalising portfolio closing prices and index points to 100 at the beginning
+WikiDaily_merge$close.normed <- WikiDaily_merge$close*(100/WikiDaily_merge$close[1])
+WikiDaily_merge$EuroStoxx.normed <- WikiDaily_merge$EuroStoxx*(100/WikiDaily_merge$EuroStoxx[1])
+
+# Calculating Portfolio/Index Return and volatility of Portfolio/Index Returns
+RR_figures <- data.frame(matrix(vector(), nrow=2, ncol=4))
+colnames(RR_figures) <- c("CKumulierte_Rendite", "Annualisierte_Rendite", "Annualisiertes_Risiko", "Sharpe_Ratio")
+rownames(RR_figures) <- c("Benchmark", "Portfolio")
+
+
+# Cumulative Returns
+RR_figures[1,1] <- returnEuroStoxx <- abs_ret(WikiDaily_merge$EuroStoxx)
+RR_figures[2,1] <- returnPortfolio <- abs_ret(WikiDaily_merge$close)
+# Annualized Returns
+RR_figures[1,2] <- ann_EuroStoxx <- ann_ret(ret= WikiDaily_merge$EuroStoxx, days_ret=days_ret, start_date = start_date, end_date=end_date)
+RR_figures[2,2] <- ann_Portfolio <- ann_ret(ret= WikiDaily_merge$close, days_ret=days_ret, start_date = start_date, end_date=end_date)
+# Risk figures (volatility)
+RR_figures[1,3] <- ann_riskBM <- sqrt(days_vola*var(WikiDaily_merge$ret.Eurostoxx))
+RR_figures[2,3] <- ann_riskPortfolio <- sqrt(days_vola*var(WikiDaily_merge$ret))
+# Sharpe Ratio (Cumulative Return/volatility)
+RR_figures[1,4] <- sharpeBM <- (ann_EuroStoxx-mean(WikiDaily_merge$rf))/ann_riskBM
+RR_figures[2,4] <- sharpePortfolio <- (ann_Portfolio-mean(WikiDaily_merge$rf))/ann_riskPortfolio
+
+# CAPM decomposition
+CAPM_portfolio <- lm(I(ret-rf)~mktrf, data = WikiDaily_merge)
+CAPM_benchmark <- lm(I(ret.Eurostoxx-rf)~mktrf, data = WikiDaily_merge)
+
+# Fama-French decomposition
+decom_portfolio <- lm(I(ret-rf) ~ mktrf+smb+hml+mom, data=WikiDaily_merge)
+decom_benchmark <- lm(I(ret.Eurostoxx-rf) ~ mktrf+smb+hml+mom, data=WikiDaily_merge)
+
+
+# data preparation Investment style plot
+factor <- rep(c( "Market", "Size", "Value", "Momentum"),2)
+y <- c(rep("Ihr Portfolio", 4), rep("Benchmark",4))
+# exclude alpha from inv.style plot
+coeffs <- c(coefficients(decom_portfolio)[2:length(coefficients(decom_portfolio))], coefficients(decom_benchmark)[2:length(coefficients(decom_benchmark))])
+inv.style <- cbind.data.frame(factor, y, coeffs)
+inv.style <- inv.style %>% filter(factor!="alpha")
+
+# data preparation Risk, Return and Style table
+
+library(data.table)
+library(formattable)
+RRS <- transpose(RR_figures)
+colnames(RRS) <- c("Benchmark", "Ihr Portfolio")
+RRS[nrow(RRS)+1,] <- c((coefficients(CAPM_benchmark)[1]+1)^days_ret-1, (coefficients(CAPM_portfolio)[1]+1)^days_ret-1)
+RRS[nrow(RRS)+1,] <- c((coefficients(decom_benchmark)[1]+1)^days_ret-1, (coefficients(decom_portfolio)[1]+1)^days_ret-1)
+rownames(RRS) <- c("Kum. Rendite","Ann. Rendite", "Ann. Risiko", "Sharpe Ratio", "Ann. CAPM adj. Alpha", "Ann. 3-Factor-adj. Alpha")
+
+# format rows, manipulate according to what you want to show.
+RRS_clean <- data.frame(RRS)
+RRS_clean <- RRS_clean[-c(3),]
+RRS_clean[1,] <- c(paste0(round(RRS[1,1]*100,2),"%"), paste0(round(RRS[1,2]*100,2),"%"))
+RRS_clean[2,] <- c(paste0(round(RRS[2,1]*100,2),"%"), paste0(round(RRS[2,2]*100,2),"%"))
+#RRS_clean[3,] <- c(paste0(round(RRS[3,1]*100,2),"%"), paste0(round(RRS[3,2]*100,2),"%")) # Ann. Risk excluded
+RRS_clean[3,] <- c(round(RRS[4,1],2), round(RRS[4,2],2))
+RRS_clean[4,] <- c(paste0(round(RRS[5,1]*100,2),"%"), paste0(round(RRS[5,2]*100,2),"%"))
+RRS_clean[5,] <- c(paste0(round(RRS[6,1]*100,2),"%"), paste0(round(RRS[6,2]*100,2),"%"))
+
+# data processing Trading Behavior
+
+Trad_figures <- data.frame(matrix(vector(), nrow=4, ncol=2))
+colnames(Trad_figures) <- c("Benchmark", "Ihr Portfolio")
+rownames(Trad_figures) <- c("Umschlag", "Investitions Temperament", "Überzeugung", "Selbstüberschätzung")
+```
+
+
+```{r, echo=FALSE, fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+
+#################
+### Plots
+#################
+
+a <- ggplot() + theme_gray() +
+  geom_line(data=WikiDaily_merge, aes(x=date, y=close.normed, col="darkred")) +
+  geom_line(data=WikiDaily_merge, aes(x=date, y=EuroStoxx.normed, col="steelblue")) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), axis.title.x=element_blank(), axis.title.y=element_blank()) +
+  scale_color_identity(name = "Preise",
+                          breaks = c("steelblue", "darkred"),
+                          labels = c("EuroStoxx", "Ihr Portfolio"),
+                          guide = "legend") +
+  labs(subtitle="Benchmark Vs Portfolio")
+  
+  
+  
+b <- ggplot() + theme_gray() +
+  geom_point(data=RR_figures[1,], aes(x=Annualized_Return, y=Annualized_Risk, col="steelblue")) +
+  geom_point(data=RR_figures[2,], aes(x=Annualized_Return, y=Annualized_Risk, col="darkred")) +
+  scale_x_continuous(labels=percent_format(accuracy = 1)) +
+  scale_y_continuous(labels=percent_format(accuracy = 1)) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), 
+  plot.caption = element_text(hjust = 0)) +
+  labs(x="Rendite", y="Risiko")+
+  scale_color_identity(name = NULL,
+                          breaks = c("steelblue", "darkred"),
+                          labels = c("Benchmark", "Ihr Portfolio"),
+                          guide = "legend") +
+  labs(subtitle="Risiko Vs Rendite", caption = "Annualisierte Volatilität und Rendite während dem Investitionszeitraum.")
+
+
+# max x range
+
+if(max(inv.style$coeffs)>1){
+  max_x <- max(inv.style$coeffs)+0.2
+} else{
+  max_x <- 1.3
+}
+
+c <- ggplot(data=inv.style, aes(coeffs,factor))+geom_point(aes(col=y)) +
+  theme(legend.position = "right", legend.title = element_text(size = 8),
+  legend.text = element_text(size = 7), 
+  plot.caption = element_text(hjust = 0), axis.title.y=element_blank()) +
+  labs(x="Exposition", col=NULL)+
+  scale_color_manual(values=c("steelblue", "darkred"))+
+  scale_x_continuous(limits = c(min(inv.style$coeffs)-0.1,max_x),
+                     breaks = c(min(inv.style$coeffs)-0.1,0,1,max_x), 
+                     label = c("niedrig","0", "1","hoch"))+
+  geom_vline(xintercept = 1, color="black")+
+  labs(subtitle="Investitionsstil", caption = "Korrelation zwischen Ihrem Portfolio und verschiedenen klassischen Portfolios. Die schwarze Linie entspricht einer Korrelation von 1.")
+
+
+lay <- rbind(c(1,1),
+             c(2,3))
+grid.arrange(a,b,c, layout_matrix = lay)
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+#################
+### Left table
+#################
+
+library(xtable)
+
+cat("\\begin{table}[H]")
+cat("\\sffamily")
+cat("\\mbox{}\\hfill")
+cat("\\begin{minipage}[t]{.48\\linewidth}")
+cat("\\centering")
+cat("\\caption*{\\large \\textbf{\\sffamily Risiko, Rendite and Stil}}")
+print(knitr::kable(RRS_clean, format = 'latex', booktabs=TRUE)%>%
+  kableExtra::pack_rows("Renditen", 1, 2) %>%
+  kableExtra::pack_rows("Risikoadj. Ergebnisindikatoren", 3, 5, latex_gap_space = "0.3cm")%>%
+  kableExtra::column_spec(column = 1, width = "12em")%>%
+  kableExtra::column_spec(column = 2, width = "4em")%>%
+  kableExtra::column_spec(column = 3, width = "5em")%>%
+  footnote(general = "Für weitere Erklärungen siehe Seite 2."))
+cat("\\end{minipage}\\hfill")
+cat("\\begin{minipage}[t]{.48\\linewidth}")
+cat("\\centering")
+cat("\\caption*{\\large \\textbf{\\sffamily Investitionsverhalten}}")
+print(knitr::kable(Trad_figures, format = 'latex', booktabs=TRUE)%>%
+  kableExtra::column_spec(column = 1, width = "10em")%>%
+  kableExtra::column_spec(column = 2, width = "5em")%>%
+  kableExtra::column_spec(column = 3, width = "6em")%>%
+  footnote(general = "Für weitere Erklärungen siehe Seite 2."))
+cat("\\end{minipage}\\hfill")
+cat("\\mbox{}")
+cat("\\end{table}")
+```
+
+\pagebreak
+
+\textbf{\large Benchmark Vs Portfolio}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+#################
+### Explanatory Text
+#################
+
+
+# Cumulative, annualized, relative returns
+
+cat(paste0("Währen der Investitionsperiode hat Ihr Portfolio eine \\textbf{kumulierte Rendite} von ", round(tail(WikiDaily_merge$close.normed, 1)-100, 2), "% erwirtschaftet, während die vergleichbare Benchmark eine Rendite von ", round(tail(WikiDaily_merge$EuroStoxx.normed, 1)-100,2), "% erzielt hat."))
+if(tail(WikiDaily_merge$EuroStoxx.normed, 1)<tail(WikiDaily_merge$close.normed, 1)){
+  cat(paste0("Sie haben die Benchmark um ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1),2),"% \\textbf{übertroffen}. "))
+}else{
+  cat(paste0("Ihr Portfolio \\textbf{verpasste} die Rendite der Benchmark um ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1), 2),"%. "))
+}
+cat(paste0("Die kumulierte Rendite Ihres Portfolios entspricht einer \\textbf{annualisierten Rendite} von ", round(RRS[2,2]*100,2), "%. Die annualisierte Rendite der Benchmark beläuft sich auf ", round(RRS[2,1]*100,2), "%."))
+```
+
+\textbf{\large Risiko vs. Rendite}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+# Annualized, relative risk
+
+if(RRS[3,2]>RRS[3,1]){
+  cat(paste0("Ihr Portfolio ist mit einer annualisierten Standardabweichung von ", round(RRS[3,2]*100,2), "% \\textbf{riskanter} als die Benchmark welche mit einer annualisierten Standardabweichung von ", round(RRS[3,1]*100,2), "% fluktuiert hat."))
+}else{
+  cat(paste0("Ihr Portfolio ist mit einer annualisierten Standardabweichung von ", round(RRS[3,2]*100,2), "% \\textbf{weniger riskant} als die Benchmark welche mit einer annualisierten Standardabweichung von ", round(RRS[3,1]*100,2), "% fluktuiert hat."))
+}
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+# Sharpe Ratio
+
+if(RRS[4,2]<RRS[4,1]){
+  cat(paste0("Die \\textbf{Sharpe Ratio} ist eine risikoadjustierte Performancekennzahl welche das Verhältnis zwischen erzielter Rendite und eingegangen Risiko berechnet. Das Risiko wird als annualisierter Volatilität Ihres Portfolios modelliert. Je höher die Sharpe Ratio desto besser. Ihr Portfolio weist eine Sharpe Ratio von ", round(RRS[4,2],2), " auf und ist somit schlechter als die Shape Ratio der Benchmark von ", round(RRS[4,1],2)))
+}else{
+  cat(paste0("Die \\textbf{Sharpe Ratio} ist eine risikoadjustierte Performancekennzahl welche das Verhältnis zwischen erzielter Rendite und eingegangen Risiko berechnet. Das Risiko wird als annualisierter Volatilität Ihres Portfolios modelliert. Je höher die Sharpe Ratio desto besser. Ihr Portfolio weist eine Sharpe Ratio von ", round(RRS[4,2],2), " auf und ist somit besser als die Shape Ratio der Benchmark von ", round(RRS[4,1],2)))
+}
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+# CAPM-alpha, 3-factor-alpha
+
+if(RRS[5,2]<0 && RRS[6,2]<0){
+  cat(paste0("Weiter risikoadjustierte Performance Kennzahlen sind das CAPM (Capital Asst Pricing Model) - respektive das 3-Faktor-adjustierte Alpha. Diese Kennzahlen zeigen ob eine Überendite erzielt werden konnte gegenüber dem Markt. Das \\textbf{CAPM-adjustierte Alpha} korrigiert dabei die realisierte Rendite nur um die generelle Markterwartung. Das \\textbf{3-factor-adjustierte Alpha} geht dabei noch einen Schritt weiter und berücksichtigt auch mögliche Einflüsse von Variabeln wie Grösse, Kurs-Buchwert-Verhältnis und Momentum. Ihr Portfolio weist sowohl ein \\text{negatives} CAPM-adjustiertes Alpha von ", round(RRS[5,2]*100,2), "% als auch ein \\textbf{negatives} 3-factor-adjustiertes Alpha von ", round(RRS[6,2]*100,2), "% aus. Sie konnten über Investitonszeitraum keine Überrendite generieren."))
+}else if(RRS[5,2]>0 && RRS[6,2]<0){
+  cat(paste0("Weiter risikoadjustierte Performance Kennzahlen sind das CAPM (Capital Asst Pricing Model) - respektive das 3-Faktor-adjustierte Alpha. Diese Kennzahlen zeigen ob eine Überendite erzielt werden konnte gegenüber dem Markt. Das \\textbf{CAPM-adjustierte Alpha} korrigiert dabei die realisierte Rendite nur um die generelle Markterwartung. Das \\textbf{3-factor-adjustierte Alpha} geht dabei noch einen Schritt weiter und berücksichtigt auch mögliche Einflüsse von Variabeln wie Grösse, Kurs-Buchwert-Verhältnis und Momentum. Ihr Portfolio weist ein \\textbf{positives} CAPM-adjustiertes Alpha von ", round(RRS[5,2]*100,2), "% auf. Wird jedoch für die Faktoren Grösse, Kurs-Buchwert-Verhältnis und Momentum kontrolliert, dann resultiert ein \\textbf{negatives} 3-factor-adjustiertes Alpha von ", round(RRS[6,2]*100,2), "%. Sie konnten lediglich eine Überrendite gegenüber dem Marktportfolio generieren."))
+}else if(RRS[5,2]>0 && RRS[6,2]>0){
+  cat(paste0("Weiter risikoadjustierte Performance Kennzahlen sind das CAPM (Capital Asst Pricing Model) - respektive das 3-Faktor-adjustierte Alpha. Diese Kennzahlen zeigen ob eine Überendite erzielt werden konnte gegenüber dem Markt. Das \\textbf{CAPM-adjustierte Alpha} korrigiert dabei die realisierte Rendite nur um die generelle Markterwartung. Das \\textbf{3-factor-adjustierte Alpha} geht dabei noch einen Schritt weiter und berücksichtigt auch mögliche Einflüsse von Variabeln wie Grösse, Kurs-Buchwert-Verhältnis und Momentum. Ihr Portfolio weist sowohl ein \\textbf{positives} CAPM-adjustiertes Alpha von ", round(RRS[5,2]*100,2), "% als auch ein \\textbf{positives} 3-factor-adjustiertes Alpha von ", round(RRS[6,2]*100,2), "% auf. Sie erzielten eine Überendite gegenüber dem Marktportfolio. Auch wenn für die zusätzlichen Variabeln Grösse, Kurs-Buchwert-Verhältnis und Momentum kontrolliert wird, konnte eine Überendite generiert werden."))
+}
+```
+
+\textbf{\large Investitionsstil}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+# Investment Style Analysis
+
+cat(paste0("Ihr Investitionsstil wurde im Hinblick auf folgende vier Merkmale analysiert: "))
+cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien mit einem niedrigen Kurs-Buchwert Verhältnis (Value-Aktien) werden unter ihrem intrinsischen Wert gehandelt und werden daher von Marktteilnehmern als unterbewertet eingestuft. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Your Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Value-Aktien als die Benchmark."}else{"Ihr Portfolio korrelierte mehr mit Value-Aktien als die Benchmark."}, "\\item \\textbf{Size:} Die Grösse eines Unternehmen (d.h. die Marktkapitalisierung) hinter einer Aktie hat oft einen Einfluss auf deren Performance. Kleinere Unternehmen neigen dazu besser zu performen als grosse Konglomerate. ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Your Portfolio")$coeffs){"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in grössere Unternehmen investiert. "}else{"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in kleinere Unternehmen investiert. "},"\\item \\textbf{Momentum:} Anleger welche eine Momentum-Strategie verfolgen, investieren dabei in die renditestärksten Aktien der jüngeren Vergangenheit. Dabei geht man von der Hypothese aus, dass Aktien welche in jüngster Vergangenheit hohe Renditen erzielt haben, dies in der nahen Zukunft auch tun werden. } ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Your Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Momentum-Aktien als die Benchmark. "}else{"Ihr Portfolio korrelierte mehr mit Momentum-Aktien als die Benchmark."}, "\\item \\textbf{Market:} Das Markt-Beta ist in Gradmesser, der aussagt, wie stark ein Asset im Vergleich zum Markt schwankt. Wert von 1 bedeutet, dass das Asset ungefähr das gleiche Risiko birgt, wie eine Investition ins Marktportfolio. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Your Portfolio")$coeffs){"Ihr Portfolio schwankte weniger stark im Vergleich zum Markt als die ausgewählte Benchmark. "}else{"Ihr Portfolio schwankte stärker im Vergleich zum Markt als die ausgewählte Benchmark. "},"\\end{itemize}"))
+```
+
+
+\textbf{\large Trading Behavior}
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+
+# Trading Behavior Analysis
+
+# !! if statements need to be adjusted
+
+cat(paste0("Ihr Investitonsverhalten wurde im Hinblick auf folgende vier Merkmale analysiert: "))
+cat(paste0("\\begin{itemize} \\item \\textbf{Turnover:} \\textcolor{red}{Something about turnover.} ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Your Portfolio")$coeffs){"Your Portfolio had less exposure to value stocks than the Benchmark."}else{"Your Portfolio had more exposure to value stocks than the Benchmark."}, "\\item \\textbf{Investment temper:} \\textcolor{red}{Something about investment temper.} ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Your Portfolio")$coeffs){"Your Portfolio was invested more heavily in stocks of bigger companies than the Benchmark."}else{"Your Portfolio was invested more heavily in stocks of smaller companies than the Benchmark."},"\\item \\textbf{Confidence:} \\textcolor{red}{Something about confidence.} ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Your Portfolio")$coeffs){"Your Portfolio had less exposure to momentum stocks compared to the Benchmark."}else{"Your Portfolio had more exposure to momentum stocks compared to the Benchmark."}, "\\item \\textbf{Overconfidence:} \\textcolor{red}{Something about overconfidence.} ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Your Portfolio")$coeffs){"Your Portfolio had less exposure to the market compared to the Benchmark."}else{"Your Portfolio had more exposure to the market compared to the Benchmark."},"\\end{itemize}"))
+```
+
+
+
