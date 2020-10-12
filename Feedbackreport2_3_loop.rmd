@@ -41,10 +41,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Calculation
 #################
 
-
-# merge the different dataframes on date
-WikiDaily_merge <- merge_mult(list_of_dfs=list(WikiDaily_Id, FactorReturns, EuroStoxx), by=c("date"))
-
 # select relevant columns and rename where necessary 
 WikiDaily_merge <- select(WikiDaily_merge, -c("datenum", "Vstoxx"))
 names(WikiDaily_merge)[names(WikiDaily_merge) == "mkt.x"] <- "factor.market"
@@ -150,7 +146,7 @@ b <- ggplot() + theme_gray() +
                           breaks = c("steelblue", "darkred"),
                           labels = c("Benchmark", "Your Portfolio"),
                           guide = "legend") +
-  labs(subtitle="Risk Vs Return", caption = "Annualized Volatility vs. Return during the investment period \nBlaBlaBla")
+  labs(subtitle="Risk Vs Return", caption = "Annualized Volatility and Return during the investment period \nBlaBlaBla")
 
 
 # max x range
@@ -158,7 +154,7 @@ b <- ggplot() + theme_gray() +
 if(max(inv.style$coeffs)>1){
   max_x <- max(inv.style$coeffs)+0.2
 } else{
-  max_x <- 1.2
+  max_x <- 1.3
 }
 
 c <- ggplot(data=inv.style, aes(coeffs,factor))+geom_point(aes(col=y)) +
@@ -171,7 +167,7 @@ c <- ggplot(data=inv.style, aes(coeffs,factor))+geom_point(aes(col=y)) +
                      breaks = c(min(inv.style$coeffs)-0.1,0,1,max_x), 
                      label = c("low","0", "1","high"))+
   geom_vline(xintercept = 1, color="black")+
-  labs(subtitle="Investment Style", caption = "Correlation of your investment style with different portfolios. \nThe black line references a correaltion of 1.")
+  labs(subtitle="Investment Style", caption = "Correlation of your investment style with different \ncharacteristic portfolios. \nThe black line references a correaltion of 1.")
 
 
 lay <- rbind(c(1,1),

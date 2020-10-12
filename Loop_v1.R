@@ -48,6 +48,15 @@ for(i in x){
   #extract real WikiID
   ID <- head(WikiDaily_Id$wikiId, 1)
   
+  # merge the different dataframes on date
+  WikiDaily_merge <- merge_mult(list_of_dfs=list(WikiDaily_Id, FactorReturns, EuroStoxx), by=c("date"))
+  
+  # check if not empty
+  if(nrow(WikiDaily_merge)==0){
+    print(sprintf("Dataframe for ID %i is empty. Time intervals do not intersect", i))
+    next()
+  }
+  
   rmarkdown::render(input = "C:/Users/Sven Kohler/Desktop/UZH/R project/UZH_Feedbackreport/Feedbackreport2_3_loop.Rmd", 
                     output_format = "pdf_document",
                     output_file = paste("test_report_", i,"_", Sys.Date(), ".pdf", sep=''),

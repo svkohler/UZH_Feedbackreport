@@ -25,7 +25,7 @@ colnames(FactorReturns)[1] <- "date"
 
 
 
-limit <- 100
+limit <- 5880
 
 Ids <- 1:limit
 
@@ -90,7 +90,7 @@ for(row in 1:nrow(mat_sort_rat_deciles)){
 }
 
 library("plot3D")
-hist3D(x=1:10, y=1:10, z = table, scale = FALSE, expand = 0.15, bty = "g", phi = 25,
+hist3D(x=1:10, y=1:10, z = table/limit, scale = FALSE, expand = 20, bty = "g", phi = 25,
        col = NULL, border = "black", shade = 0.2, ltheta = 90,
        space = 0.2, ticktype = "detailed", d = 2, colvar = table,
        xlab="Decile standard Sortino", ylab="Decile time adjusted Sortino", main="Transition of standard vs. time adj. Sortino ratios")
