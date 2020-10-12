@@ -47,7 +47,7 @@ sortino_ratio <- function(list_of_returns,
                           start_date, 
                           end_date, 
                           time_unit=list("years", "months", "days"),
-                          minimum_acceptable_return = list("zero", "average", "user_defined"),
+                          minimum_acceptable_return = list(0, "average", "user_defined"),
                           user_treshold){
   
   stopifnot(length(list_of_returns)==length(list_of_rf))

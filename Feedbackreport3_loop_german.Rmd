@@ -52,8 +52,8 @@ WikiDaily_merge$close.normed <- WikiDaily_merge$close*(100/WikiDaily_merge$close
 WikiDaily_merge$EuroStoxx.normed <- WikiDaily_merge$EuroStoxx*(100/WikiDaily_merge$EuroStoxx[1])
 
 # Calculating Portfolio/Index Return and volatility of Portfolio/Index Returns
-RR_figures <- data.frame(matrix(vector(), nrow=2, ncol=4))
-colnames(RR_figures) <- c("CKumulierte_Rendite", "Annualisierte_Rendite", "Annualisiertes_Risiko", "Sharpe_Ratio")
+RR_figures <- data.frame(matrix(vector(), nrow=2, ncol=5))
+colnames(RR_figures) <- c("Kumulierte_Rendite", "Annualisierte_Rendite", "Annualisiertes_Risiko", "Sharpe_Ratio", "Sortino Ratio")
 rownames(RR_figures) <- c("Benchmark", "Portfolio")
 
 
@@ -66,10 +66,15 @@ RR_figures[2,2] <- ann_Portfolio <- ann_ret(ret= WikiDaily_merge$close, days_ret
 # Risk figures (volatility)
 RR_figures[1,3] <- ann_riskBM <- sqrt(days_vola*var(WikiDaily_merge$ret.Eurostoxx))
 RR_figures[2,3] <- ann_riskPortfolio <- sqrt(days_vola*var(WikiDaily_merge$ret))
-# Sharpe Ratio (Cumulative Return/volatility)
+# Sharpe Ratio (Ann. Return/volatility)
 RR_figures[1,4] <- sharpeBM <- (ann_EuroStoxx-mean(WikiDaily_merge$rf))/ann_riskBM
 RR_figures[2,4] <- sharpePortfolio <- (ann_Portfolio-mean(WikiDaily_merge$rf))/ann_riskPortfolio
+# Sortino Ratio (Ann.Return/downward volatility)
+RR_figures[1,5] <- sortinoBM <- sortino_ratio(list_of_returns = WikiDaily_merge$ret.Eurostoxx, list_of_rf = WikiDaily_merge$rf, closing_prices = WikiDaily_merge$EuroStoxx, 
+                                              start_date = start_date, end_date = end_date, time_adj = FALSE, time_unit = "years", minimum_acceptable_return = 0)
 
+RR_figures[2,5] <- sortinoPortfolio <- sortino_ratio(list_of_returns = WikiDaily_merge$ret, list_of_rf = WikiDaily_merge$rf, closing_prices = WikiDaily_merge$close, 
+                                              start_date = start_date, end_date = end_date, time_adj = FALSE, time_unit = "years", minimum_acceptable_return = 0) 
 # CAPM decomposition
 CAPM_portfolio <- lm(I(ret-rf)~mktrf, data = WikiDaily_merge)
 CAPM_benchmark <- lm(I(ret.Eurostoxx-rf)~mktrf, data = WikiDaily_merge)
@@ -95,23 +100,26 @@ RRS <- transpose(RR_figures)
 colnames(RRS) <- c("Benchmark", "Ihr Portfolio")
 RRS[nrow(RRS)+1,] <- c((coefficients(CAPM_benchmark)[1]+1)^days_ret-1, (coefficients(CAPM_portfolio)[1]+1)^days_ret-1)
 RRS[nrow(RRS)+1,] <- c((coefficients(decom_benchmark)[1]+1)^days_ret-1, (coefficients(decom_portfolio)[1]+1)^days_ret-1)
-rownames(RRS) <- c("Kum. Rendite","Ann. Rendite", "Ann. Risiko", "Sharpe Ratio", "Ann. CAPM adj. Alpha", "Ann. 3-Factor-adj. Alpha")
+rownames(RRS) <- c("Kum. Rendite","Ann. Rendite", "Ann. Risiko", "Sharpe Ratio", "Sortino Ratio", "Ann. CAPM adj. Alpha", "Ann. 3-Factor-adj. Alpha")
 
 # format rows, manipulate according to what you want to show.
 RRS_clean <- data.frame(RRS)
-RRS_clean <- RRS_clean[-c(3),]
+RRS_clean <- RRS_clean[-c(3,6,7),]
 RRS_clean[1,] <- c(paste0(round(RRS[1,1]*100,2),"%"), paste0(round(RRS[1,2]*100,2),"%"))
 RRS_clean[2,] <- c(paste0(round(RRS[2,1]*100,2),"%"), paste0(round(RRS[2,2]*100,2),"%"))
 #RRS_clean[3,] <- c(paste0(round(RRS[3,1]*100,2),"%"), paste0(round(RRS[3,2]*100,2),"%")) # Ann. Risk excluded
 RRS_clean[3,] <- c(round(RRS[4,1],2), round(RRS[4,2],2))
-RRS_clean[4,] <- c(paste0(round(RRS[5,1]*100,2),"%"), paste0(round(RRS[5,2]*100,2),"%"))
-RRS_clean[5,] <- c(paste0(round(RRS[6,1]*100,2),"%"), paste0(round(RRS[6,2]*100,2),"%"))
+RRS_clean[4,] <- c(round(RRS[5,1],2), round(RRS[5,2],2))
+#RRS_clean[4,] <- c(paste0(round(RRS[5,1]*100,2),"%"), paste0(round(RRS[5,2]*100,2),"%")) # alpha measures on other table without benchmark
+#RRS_clean[5,] <- c(paste0(round(RRS[6,1]*100,2),"%"), paste0(round(RRS[6,2]*100,2),"%"))
 
 # data processing Trading Behavior
 
-Trad_figures <- data.frame(matrix(vector(), nrow=4, ncol=1))
+Trad_figures <- data.frame(matrix(vector(), nrow=6, ncol=1))
 colnames(Trad_figures) <- c("Ihr Portfolio")
-rownames(Trad_figures) <- c("Turnover", "Investitions Temperament", "Überzeugung", "Selbstüberschätzung")
+rownames(Trad_figures) <- c("Ann. CAPM adj. Alpha", "Ann. 3-Factor-adj. Alpha", "Turnover", "Investitions Temperament", "Überzeugung", "Selbstüberschätzung")
+Trad_figures[1,1] <- c( paste0(round(RRS[6,2]*100,2),"%"))
+Trad_figures[2,1] <- c( paste0(round(RRS[7,2]*100,2),"%"))
 ```
 
 
@@ -135,10 +143,10 @@ a <- ggplot() + theme_gray() +
   
   
 b <- ggplot() + theme_gray() +
-  geom_point(data=RR_figures[1,], aes(x=Annualized_Return, y=Annualized_Risk, col="steelblue")) +
-  geom_point(data=RR_figures[2,], aes(x=Annualized_Return, y=Annualized_Risk, col="darkred")) +
-  scale_x_continuous(labels=percent_format(accuracy = 1)) +
-  scale_y_continuous(labels=percent_format(accuracy = 1)) +
+  geom_point(data=RR_figures[1,], aes(x=Annualisierte_Rendite, y=Annualisiertes_Risiko, col="steelblue")) +
+  geom_point(data=RR_figures[2,], aes(x=Annualisierte_Rendite, y=Annualisiertes_Risiko, col="darkred")) +
+  scale_x_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,2])-0.02, max(RR_figures[,2])+0.02)) +
+  scale_y_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,3])-0.02, max(RR_figures[,3])+0.02)) +
   theme(legend.position = "right", legend.title = element_text(size = 8),
   legend.text = element_text(size = 7), 
   plot.caption = element_text(hjust = 0)) +
@@ -147,7 +155,7 @@ b <- ggplot() + theme_gray() +
                           breaks = c("steelblue", "darkred"),
                           labels = c("Benchmark", "Ihr Portfolio"),
                           guide = "legend") +
-  labs(subtitle="Risiko Vs Rendite", caption = "Annualisierte Volatilität und Rendite während dem Investitionszeitraum.")
+  labs(subtitle="Risiko Vs Rendite", caption = "Annualisierte Volatilität und Rendite während dem \nInvestitionszeitraum.")
 
 
 # max x range
@@ -167,8 +175,8 @@ c <- ggplot(data=inv.style, aes(coeffs,factor))+geom_point(aes(col=y)) +
   scale_x_continuous(limits = c(min(inv.style$coeffs)-0.1,max_x),
                      breaks = c(min(inv.style$coeffs)-0.1,0,1,max_x), 
                      label = c("niedrig","0", "1","hoch"))+
-  geom_vline(xintercept = 1, color="black")+
-  labs(subtitle="Investitionsstil", caption = "Korrelation zwischen Ihrem Portfolio und verschiedenen klassischen Portfolios. Die schwarze Linie entspricht einer Korrelation von 1.")
+  geom_vline(xintercept = 1, color="grey30", linetype="dotted")+
+  labs(subtitle="Investitionsstil", caption = "Korrelation zwischen Ihrem Portfolio und verschiedenen \nklassischen Portfolios. Die schwarze Linie entspricht einer \nKorrelation von 1.")
 
 
 lay <- rbind(c(1,1),
@@ -194,7 +202,7 @@ cat("\\centering")
 cat("\\caption*{\\large \\textbf{\\sffamily Risiko, Rendite and Stil}}")
 print(knitr::kable(RRS_clean, format = 'latex', booktabs=TRUE)%>%
   kableExtra::pack_rows("Renditen", 1, 2) %>%
-  kableExtra::pack_rows("Risikoadj. Ergebnisindikatoren", 3, 5, latex_gap_space = "0.3cm")%>%
+  kableExtra::pack_rows("Risikoadj. Ergebnisindikatoren", 3, 4, latex_gap_space = "0.3cm")%>%
   kableExtra::column_spec(column = 1, width = "12em")%>%
   kableExtra::column_spec(column = 2, width = "4em")%>%
   kableExtra::column_spec(column = 3, width = "5em")%>%
@@ -203,8 +211,8 @@ cat("\\end{minipage}\\hfill")
 cat("\\begin{minipage}[t]{.48\\linewidth}")
 cat("\\centering")
 cat("\\caption*{\\large \\textbf{\\sffamily Investitionsverhalten}}")
-print(knitr::kable(Trad_figures, format = 'latex', booktabs=TRUE)%>%
-  kableExtra::column_spec(column = 1, width = "10em")%>%
+print(knitr::kable(Trad_figures, format = 'latex',linesep = c("\\addlinespace[1mm]"), booktabs=TRUE)%>%
+  kableExtra::column_spec(column = 1, width = "20em")%>%
   kableExtra::column_spec(column = 2, width = "5em")%>%
   footnote(general = "Für weitere Erklärungen siehe Seite 2."))
 cat("\\end{minipage}\\hfill")
@@ -258,6 +266,7 @@ if(RRS[4,2]<RRS[4,1]){
 }
 ```
 
+
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
 
 # CAPM-alpha, 3-factor-alpha
@@ -278,9 +287,8 @@ if(RRS[5,2]<0 && RRS[6,2]<0){
 # Investment Style Analysis
 
 cat(paste0("Ihr Investitionsstil wurde im Hinblick auf folgende vier Merkmale analysiert: "))
-cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien mit einem niedrigen Kurs-Buchwert Verhältnis (Value-Aktien) werden unter ihrem intrinsischen Wert gehandelt und werden daher von Marktteilnehmern als unterbewertet eingestuft. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Your Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Value-Aktien als die Benchmark."}else{"Ihr Portfolio korrelierte mehr mit Value-Aktien als die Benchmark."}, "\\item \\textbf{Size:} Die Grösse eines Unternehmen (d.h. die Marktkapitalisierung) hinter einer Aktie hat oft einen Einfluss auf deren Performance. Kleinere Unternehmen neigen dazu besser zu performen als grosse Konglomerate. ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Your Portfolio")$coeffs){"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in grössere Unternehmen investiert. "}else{"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in kleinere Unternehmen investiert. "},"\\item \\textbf{Momentum:} Anleger welche eine Momentum-Strategie verfolgen, investieren dabei in die renditestärksten Aktien der jüngeren Vergangenheit. Dabei geht man von der Hypothese aus, dass Aktien welche in jüngster Vergangenheit hohe Renditen erzielt haben, dies in der nahen Zukunft auch tun werden. } ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Your Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Momentum-Aktien als die Benchmark. "}else{"Ihr Portfolio korrelierte mehr mit Momentum-Aktien als die Benchmark."}, "\\item \\textbf{Market:} Das Markt-Beta ist in Gradmesser, der aussagt, wie stark ein Asset im Vergleich zum Markt schwankt. Wert von 1 bedeutet, dass das Asset ungefähr das gleiche Risiko birgt, wie eine Investition ins Marktportfolio. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Your Portfolio")$coeffs){"Ihr Portfolio schwankte weniger stark im Vergleich zum Markt als die ausgewählte Benchmark. "}else{"Ihr Portfolio schwankte stärker im Vergleich zum Markt als die ausgewählte Benchmark. "},"\\end{itemize}"))
+cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien mit einem niedrigen Kurs-Buchwert Verhältnis (Value-Aktien) werden unter ihrem intrinsischen Wert gehandelt und werden daher von Marktteilnehmern als unterbewertet eingestuft. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Value-Aktien als die Benchmark."}else{"Ihr Portfolio korrelierte mehr mit Value-Aktien als die Benchmark."}, "\\item \\textbf{Size:} Die Grösse eines Unternehmen (d.h. die Marktkapitalisierung) hinter einer Aktie hat oft einen Einfluss auf deren Performance. Kleinere Unternehmen neigen dazu besser zu performen als grosse Konglomerate. ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Ihr Portfolio")$coeffs){"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in grössere Unternehmen investiert. "}else{"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in kleinere Unternehmen investiert. "},"\\item \\textbf{Momentum:} Anleger welche eine Momentum-Strategie verfolgen, investieren dabei in die renditestärksten Aktien der jüngeren Vergangenheit. Dabei geht man von der Hypothese aus, dass Aktien welche in jüngster Vergangenheit hohe Renditen erzielt haben, dies in der nahen Zukunft auch tun werden. ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Momentum-Aktien als die Benchmark. "}else{"Ihr Portfolio korrelierte mehr mit Momentum-Aktien als die Benchmark."}, "\\item \\textbf{Market:} Das Markt-Beta ist in Gradmesser, der aussagt, wie stark ein Asset im Vergleich zum Markt schwankt. Wert von 1 bedeutet, dass das Asset ungefähr das gleiche Risiko birgt, wie eine Investition ins Marktportfolio. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio schwankte weniger stark im Vergleich zum Markt als die ausgewählte Benchmark. "}else{"Ihr Portfolio schwankte stärker im Vergleich zum Markt als die ausgewählte Benchmark. "},"\\end{itemize}"))
 ```
-
 
 \textbf{\large Trading Behavior}
 
@@ -291,6 +299,5 @@ cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien 
 # !! if statements need to be adjusted
 
 cat(paste0("Ihr Investitonsverhalten wurde im Hinblick auf folgende vier Merkmale analysiert: "))
-cat(paste0("\\begin{itemize} \\item \\textbf{Turnover:} Der Portfolio Turnover ist eine Kennzahl welche die generelle Trading Aktivität misst. Dabei werden Ihre Käufe und Verkäufe von Wertpapieren während der Investitonsperiode ins Verhältnis zum gesamten Vermögens gesetzt. } ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Your Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to value stocks than the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to value stocks than the Benchmark.}"}, "\\item \\textbf{Investitionstemperament:} Dies ist eine Kennzahl welche die Reaktion eines Instvestors zur Marktaktivität misst. Dabei wird die Korrelation zwischen der Marktvolatilität und der Anzahl getätigter Trades des Investors untersucht. Ist diese Korrelation positiv, so reagiert der Investor verstärkt auf Marktunsicherheit und weist ein erhöhtes Investitionstemperament auf. } ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Your Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio was invested more heavily in stocks of bigger companies than the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio was invested more heavily in stocks of smaller companies than the Benchmark.}"},"\\item \\textbf{Überzeugung:} Mit Überzeugung wird gemessen ob der Investor eher dazu neigt kleine oder grosse Trades zu tätigen. Dabei wird das Volumen der individuellen Trades im Verhältnis zum Wert des Portfolios analysiert. Investoren welche grössere Volumina handeln, haben eine höhere Überzeugung ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Your Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to momentum stocks compared to the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to momentum stocks compared to the Benchmark.}"}, "\\item \\textbf{Selbstüberschätzung:} Investoren welche sich und Ihre Fähigkeiten überschätzen weisen häufig einen hohen Portfolio Turnover in Kombination mit underdurchschnittliche Renditen auf. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Your Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to the market compared to the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to the market compared to the Benchmark.}"},"\\end{itemize}"))
+cat(paste0("\\begin{itemize} \\item \\textbf{Turnover:} Der Portfolio Turnover ist eine Kennzahl welche die generelle Trading Aktivität misst. Dabei werden Ihre Käufe und Verkäufe von Wertpapieren während der Investitonsperiode ins Verhältnis zum gesamten Vermögens gesetzt. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Ihr Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to value stocks than the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to value stocks than the Benchmark.}"}, "\\item \\textbf{Investitionstemperament:} Dies ist eine Kennzahl welche die Reaktion eines Instvestors zur Marktaktivität misst. Dabei wird die Korrelation zwischen der Marktvolatilität und der Anzahl getätigter Trades des Investors untersucht. Ist diese Korrelation positiv, so reagiert der Investor verstärkt auf Marktunsicherheit und weist ein erhöhtes Investitionstemperament auf. " ,if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Ihr Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio was invested more heavily in stocks of bigger companies than the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio was invested more heavily in stocks of smaller companies than the Benchmark.}"},"\\item \\textbf{Überzeugung:} Mit Überzeugung wird gemessen ob der Investor eher dazu neigt kleine oder grosse Trades zu tätigen. Dabei wird das Volumen der individuellen Trades im Verhältnis zum Wert des Portfolios analysiert. Investoren welche grössere Volumina handeln, haben eine höhere Überzeugung. ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Ihr Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to momentum stocks compared to the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to momentum stocks compared to the Benchmark.}"}, "\\item \\textbf{Selbstüberschätzung:} Investoren welche sich und Ihre Fähigkeiten überschätzen weisen häufig einen hohen Portfolio Turnover in Kombination mit underdurchschnittliche Renditen auf. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Ihr Portfolio")$coeffs){"\\textcolor{red}{Your Portfolio had less exposure to the market compared to the Benchmark.}"}else{"\\textcolor{red}{Your Portfolio had more exposure to the market compared to the Benchmark.}"},"\\end{itemize}"))
 ```
-

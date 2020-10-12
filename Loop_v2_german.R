@@ -32,7 +32,7 @@ levels(WikiDaily_mod$wiki_nr) <- c(1:5880) # previous inspection: found 5880 dif
 # setting the name of the first column of the factor returns for later merging
 colnames(FactorReturns)[1] <- "date"
 
-x <- 1:3
+x <- 1:1
 
 #define days
 days_ret <-  365 #calender days
@@ -57,9 +57,9 @@ for(i in x){
     next()
   }
   
-  rmarkdown::render(input = "C:/Users/Sven Kohler/Desktop/UZH/R project/UZH_Feedbackreport/Feedbackreport2_3_loop.Rmd", 
+  rmarkdown::render(input = "C:/Users/Sven Kohler/Desktop/UZH/R project/UZH_Feedbackreport/Feedbackreport3_loop_german.Rmd", 
                     output_format = "pdf_document",
                     output_file = paste("test_report_", i,"_", Sys.Date(), ".pdf", sep=''),
                     output_dir = "C:/Users/Sven Kohler/Desktop/UZH/LoopReports",
-                    params = list(date = paste(as.character(start_date),as.character(end_date), sep="-"), Id = ID))
+                    params = list(date = paste(as.character(format(start_date, "%d %b %y")),as.character(format(end_date, "%d %b %y")), sep="-"), Id = ID))
 }
