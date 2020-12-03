@@ -1,18 +1,5 @@
-setwd("C:/Users/Sven Kohler/Desktop/UZH")
-
-library(knitr)
-library(markdown)
-library(rmarkdown)
-library(dplyr)
-library(ggplot2)
-library(hrbrthemes)
-library(gridExtra)
-library(grid)
-library(lattice)
-library(kableExtra)
-library(scales)
-library(lubridate)
-library(StatMeasures)
+# source all the necessary packages
+source("requirements.R")
 
 # load functions file
 source("functions_report.R")
@@ -61,5 +48,5 @@ for(i in x){
                     output_format = "pdf_document",
                     output_file = paste("test_report_", i,"_", Sys.Date(), ".pdf", sep=''),
                     output_dir = "C:/Users/Sven Kohler/Desktop/UZH/LoopReports",
-                    params = list(date = paste(as.character(format(start_date, "%d %b %y")),as.character(format(end_date, "%d %b %y")), sep="-"), Id = ID))
+                    params = list(date = paste(as.character(format(start_date, "%d %b %y")),as.character(format(end_date, "%d %b %y")), sep=" - "), Id = ID))
 }
