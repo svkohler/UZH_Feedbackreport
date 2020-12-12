@@ -70,6 +70,70 @@ geom_ret <- function(prices, returns=FALSE){
 }
 #geom_ret(prices = WikiDaily_merge$close)
 
+geom_ret_shrink <- function(prices, 
+                            rf=NULL,
+                            returns=FALSE, 
+                            start_date, 
+                            end_date,
+                            time_unit=list("years", "months", "days"),
+                            shrink = list("None", "exponential"), 
+                            expo_factor = 0.5
+                            ){
+  #flag if user provided prices or returns
+  if(returns==FALSE){
+    return <- geom_ret(prices, returns=FALSE)
+  }else{
+    return <- geom_ret(prices, returns=FALSE)
+  }
+  # flag if return should be shrinked
+  if(shrink=="None"){
+    return(return)
+  }else if(shrink!="None"){
+    stopifnot(length(prices)==length(rf))
+    risk_free <- geom_ret(rf, returns=TRUE)
+    inv_time <- time_length(difftime(end_date,start_date), unit = time_unit)
+    if(shrink=="exponential"){
+      shrink_factor =expo_shrink(inv_time, factor=expo_factor)
+      return(shrink_factor * return + (1-shrink_factor)*risk_free)
+    }
+  }
+}
+
+###############
+
+# implementation of downward volatility
+
+#############
+
+downward_vola <- function(list_of_returns, minimum_acceptable_return = list(0, "average", "user_defined"), user_treshold, raw_ret = TRUE){
+  # case differentiation for different thresholds
+  # yields returns below a user-defined threshold
+  if(minimum_acceptable_return==0){
+    cut_off_returns <- elem_min(list_of_returns, threshold=0)
+  }else if(minimum_acceptable_return=="average"){
+    cut_off_returns <- elem_min(list_of_returns, threshold=mean(list_of_returns))
+  } else if(minimum_acceptable_return=="user-defined"){
+    cut_off_returns <- elem_min(list_of_returns, threshold=user_treshold)
+  }
+  # calculate downward standard deviation
+  return(sqrt(mean(cut_off_returns**2)))
+}
+
+############
+
+# helper function. sets all values in list above user-defined threshold to zero
+
+###########
+
+elem_min <- function(list, threshold=0){
+  new_list <- c(0)*length(list)
+  for(i in 1:length(list)){
+    min <- min(list[i]-threshold, 0)
+    new_list[i] <- min
+  }
+  return(new_list)
+}
+
 
 # define a few functions for transition plot
 sortino_ratio <- function(returns, 
@@ -127,41 +191,6 @@ sortino_ratio <- function(returns,
     return(sqrt(inv_time)*sort_rat)
   }
   
-}
-
-###############
-
-# implementation of downward volatility
-
-#############
-
-downward_vola <- function(list_of_returns, minimum_acceptable_return = list(0, "average", "user_defined"), user_treshold, raw_ret = TRUE){
-  # case differentiation for different thresholds
-  # yields returns below a user-defined threshold
-  if(minimum_acceptable_return==0){
-    cut_off_returns <- elem_min(list_of_returns, threshold=0)
-  }else if(minimum_acceptable_return=="average"){
-    cut_off_returns <- elem_min(list_of_returns, threshold=mean(list_of_returns))
-  } else if(minimum_acceptable_return=="user-defined"){
-    cut_off_returns <- elem_min(list_of_returns, threshold=user_treshold)
-  }
-  # calculate downward standard deviation
-  return(sqrt(mean(cut_off_returns**2)))
-}
-
-############
-
-# helper function. sets all values in list above user-defined threshold to zero
-
-###########
-
-elem_min <- function(list, threshold=0){
-  new_list <- c(0)*length(list)
-  for(i in 1:length(list)){
-    min <- min(list[i]-threshold, 0)
-    new_list[i] <- min
-  }
-  return(new_list)
 }
 
 
@@ -278,6 +307,45 @@ expo_shrink <- function(x, factor=0.5){
 na.zero <- function (x) {
   x[is.na(x)] <- 0
   return(x)
+}
+
+rank_custom <- function(x, na.last, quantile){
+  # exclude NAN values from ranking
+  raw_rank <- rank(-x, na.last=na.last) # multiply x by -1 to award rank 1 to highest value
+  # divide the raw rank by the length of non-NAN values to get the relativ ranking.
+  # in a second step multiply by the number of quantiles to get a number in the right range
+  # ceiling to round all the floats to the next higher integer
+  quantile_rank <- ceiling(raw_rank/length(raw_rank[!is.na(raw_rank)])*quantiles)
+  return(quantile_rank)
+}
+
+drop <- function(df, colnames){
+  # drop a column by name from df
+  return(df[, -which(names(df) %in% colnames)])
+}
+
+clean_and_save <- function(file){
+  # specific data processing for factor data downloaded here: 
+  #https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+  file_load <- read.csv(paste0(file,".csv"), sep = ",", header=TRUE)
+  print("file loaded")
+  date_string <- sapply(file_load$X, toString)
+  dates <- as.Date(date_string, "%Y%m%d")
+  file_drop <- drop(file_load, c("X"))
+  file_norm <- file_drop/100
+  file_norm$date <- dates
+  saveRDS(file_norm, paste0(file,".RDS"))
+}
+
+get_factor_data <- function(factor_data=c("europe", "developed", "north_america")){
+  # helper function to get the right factor file
+  if(factor_data=="europe"){
+    return(Factor_Europe)
+  }else if(factor_data=="developed"){
+    return(Factor_Developed)
+  }else if(factor_data=="north_america"){
+    return(Factor_North_America)
+  } 
 }
 
 

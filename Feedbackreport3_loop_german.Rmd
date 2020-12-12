@@ -22,7 +22,7 @@ output: pdf_document
 \makeatletter
 \fancypagestyle{plain}{
   \fancyhf{}
-  \fancyhead[R]{Inv. period: \@date}
+  \fancyhead[R]{Inv. Zeitraum: \@date}
   \fancyhead[C]{\small{ID: \@author}}
   \fancyhead[L]{Feedback Investitionsverhalten}
   \fancyfoot[C]{\thepage}
@@ -145,8 +145,8 @@ a <- ggplot() + theme_gray() +
 b <- ggplot() + theme_gray() +
   geom_point(data=RR_figures[1,], aes(x=Annualisierte_Rendite, y=Annualisiertes_Risiko, col="steelblue")) +
   geom_point(data=RR_figures[2,], aes(x=Annualisierte_Rendite, y=Annualisiertes_Risiko, col="darkred")) +
-  scale_x_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,2])-0.02, max(RR_figures[,2])+0.02)) +
-  scale_y_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,3])-0.02, max(RR_figures[,3])+0.02)) +
+  scale_x_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,2])-0.05, max(RR_figures[,2])+0.05)) + # adjust indent for points in plot
+  scale_y_continuous(labels=percent_format(accuracy = 1), limits = c(min(RR_figures[,3])-0.05, max(RR_figures[,3])+0.05)) +
   theme(legend.position = "right", legend.title = element_text(size = 8),
   legend.text = element_text(size = 7), 
   plot.caption = element_text(hjust = 0)) +
@@ -222,7 +222,7 @@ cat("\\end{table}")
 
 \pagebreak
 
-\textbf{\large Benchmark Vs Portfolio}
+\textbf{\large Benchmark vs. Portfolio}
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
 
@@ -233,7 +233,7 @@ cat("\\end{table}")
 
 # Cumulative, annualized, relative returns
 
-cat(paste0("Währen der Investitionsperiode hat Ihr Portfolio eine \\textbf{kumulierte Rendite} von ", round(tail(WikiDaily_merge$close.normed, 1)-100, 2), "% erwirtschaftet, während die vergleichbare Benchmark eine Rendite von ", round(tail(WikiDaily_merge$EuroStoxx.normed, 1)-100,2), "% erzielt hat."))
+cat(paste0("Währen der Investitionsperiode hat Ihr Portfolio eine \\textbf{kumulierte Rendite} von ", round(tail(WikiDaily_merge$close.normed, 1)-100, 2), "% erwirtschaftet, während die vergleichbare Benchmark eine Rendite von ", round(tail(WikiDaily_merge$EuroStoxx.normed, 1)-100,2), "% erzielt hat. "))
 if(tail(WikiDaily_merge$EuroStoxx.normed, 1)<tail(WikiDaily_merge$close.normed, 1)){
   cat(paste0("Sie haben die Benchmark um ", round(tail(WikiDaily_merge$close.normed, 1)-tail(WikiDaily_merge$EuroStoxx.normed, 1),2),"% \\textbf{übertroffen}. "))
 }else{
@@ -254,6 +254,11 @@ if(RRS[3,2]>RRS[3,1]){
   cat(paste0("Ihr Portfolio ist mit einer annualisierten Standardabweichung von ", round(RRS[3,2]*100,2), "% \\textbf{weniger riskant} als die Benchmark welche mit einer annualisierten Standardabweichung von ", round(RRS[3,1]*100,2), "% fluktuiert hat."))
 }
 ```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+cat(paste0("Im Risiko-Rendite Diagram können Sie sehen, wie sich Ihr Risiko-Rendite Mix im Vergleich zur Benchmark positioniert."))
+```
+
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
 
@@ -287,7 +292,7 @@ if(RRS[5,2]<0 && RRS[6,2]<0){
 # Investment Style Analysis
 
 cat(paste0("Ihr Investitionsstil wurde im Hinblick auf folgende vier Merkmale analysiert: "))
-cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien mit einem niedrigen Kurs-Buchwert Verhältnis (Value-Aktien) werden unter ihrem intrinsischen Wert gehandelt und werden daher von Marktteilnehmern als unterbewertet eingestuft. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Value-Aktien als die Benchmark."}else{"Ihr Portfolio korrelierte mehr mit Value-Aktien als die Benchmark."}, "\\item \\textbf{Size:} Die Grösse eines Unternehmen (d.h. die Marktkapitalisierung) hinter einer Aktie hat oft einen Einfluss auf deren Performance. Kleinere Unternehmen neigen dazu besser zu performen als grosse Konglomerate. ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Ihr Portfolio")$coeffs){"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in grössere Unternehmen investiert. "}else{"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in kleinere Unternehmen investiert. "},"\\item \\textbf{Momentum:} Anleger welche eine Momentum-Strategie verfolgen, investieren dabei in die renditestärksten Aktien der jüngeren Vergangenheit. Dabei geht man von der Hypothese aus, dass Aktien welche in jüngster Vergangenheit hohe Renditen erzielt haben, dies in der nahen Zukunft auch tun werden. ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Momentum-Aktien als die Benchmark. "}else{"Ihr Portfolio korrelierte mehr mit Momentum-Aktien als die Benchmark."}, "\\item \\textbf{Market:} Das Markt-Beta ist in Gradmesser, der aussagt, wie stark ein Asset im Vergleich zum Markt schwankt. Wert von 1 bedeutet, dass das Asset ungefähr das gleiche Risiko birgt, wie eine Investition ins Marktportfolio. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio schwankte weniger stark im Vergleich zum Markt als die ausgewählte Benchmark. "}else{"Ihr Portfolio schwankte stärker im Vergleich zum Markt als die ausgewählte Benchmark. "},"\\end{itemize}"))
+cat(paste0("\\begin{itemize} \\item \\textbf{Kurs-Buchwert Verhältnis:} Aktien mit einem niedrigen Kurs-Buchwert Verhältnis (Value-Aktien) werden unter ihrem intrinsischen Wert gehandelt und werden daher von Marktteilnehmern als unterbewertet eingestuft. ",if(subset(inv.style, factor=="Value" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Value" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Value-Aktien als die Benchmark."}else{"Ihr Portfolio korrelierte mehr mit Value-Aktien als die Benchmark."}, "\\item \\textbf{Size:} Die Grösse eines Unternehmen (d.h. die Marktkapitalisierung) hinter einer Aktie hat oft einen Einfluss auf deren Performance. Kleinere Unternehmen neigen dazu besser zu performen als grosse Konglomerate. ",if(subset(inv.style, factor=="Size" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Size" & y=="Ihr Portfolio")$coeffs){"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in grössere Unternehmen investiert. "}else{"Verglichen mit der Benchmark, haben Sie mit Ihrer Portfolioallokation vermehrt in kleinere Unternehmen investiert. "},"\\item \\textbf{Momentum:} Anleger welche eine Momentum-Strategie verfolgen, investieren dabei in die renditestärksten Aktien der jüngeren Vergangenheit. Dabei geht man von der Hypothese aus, dass Aktien welche in jüngster Vergangenheit hohe Renditen erzielt haben, dies in der nahen Zukunft auch tun werden. ",if(subset(inv.style, factor=="Momentum" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Momentum" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio korrelierte weniger mit Momentum-Aktien als die Benchmark. "}else{"Ihr Portfolio korrelierte mehr mit Momentum-Aktien als die Benchmark."}, "\\item \\textbf{Market:} Das Markt-Beta ist in Gradmesser, der aussagt, wie stark ein Asset im Vergleich zum Markt schwankt. Ein Wert von 1 bedeutet, dass das Asset ungefähr das gleiche Risiko birgt, wie eine Investition ins Marktportfolio. ",if(subset(inv.style, factor=="Market" & y=="Benchmark")$coeffs>subset(inv.style, factor=="Market" & y=="Ihr Portfolio")$coeffs){"Ihr Portfolio schwankte weniger stark im Vergleich zum Markt als die ausgewählte Benchmark. "}else{"Ihr Portfolio schwankte stärker im Vergleich zum Markt als die ausgewählte Benchmark. "},"\\end{itemize}"))
 ```
 
 \textbf{\large Trading Behavior}

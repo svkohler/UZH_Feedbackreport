@@ -306,7 +306,7 @@ plot_ratios <- function(all_ratios, ratio_A, ratio_B){
 #########
 
 # choose 2 arbitrary ratios from columns(all_rat) and compare
-plot_ratios(all_ratios=all_rat_clean, ratio_A = "Sharpe_normal", ratio_B ="Sharpe_time")
+plot_ratios(all_ratios=all_rat_clean, ratio_A = "G/L_time_shrink", ratio_B ="Sortino_time")
 
 
 correlation_A_B <- function(all_ratios, ratio_A, ratio_B){
